@@ -254,7 +254,7 @@ function network () {
                 //Find derivative of outputs with respect to inputs
                 theseDerivatives = multiplyArrs(theseDerivatives,layerSigmoid(theseDerivatives));
                 
-                console.log(multiplyArrs(theseDerivatives,currentDerivatives));
+                console.log(currentDerivatives,theseDerivatives,multiplyArrs(theseDerivatives,currentDerivatives));
                 //update "current derivatives" array
                 currentDerivatives = multiplyArrs(theseDerivatives,currentDerivatives);
                 
