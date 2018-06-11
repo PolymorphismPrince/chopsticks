@@ -249,7 +249,7 @@ function network () {
             
             
             //Differentiate Output layer outs with respect to their net input
-            let outputDerivatives = layerSigmoid(outputLayer);
+            let outputDerivatives = layerSigmoidDerivative(outputLayer);
             
             let totalLayerError = sum(layerError);
             this.errorArr.push(totalLayerError);
@@ -307,7 +307,7 @@ function network () {
                 newValues[l] = layerArray;
                 
                 //Find derivative of outputs with respect to inputs
-                theseDerivatives = multiplyArrs(theseDerivatives,layerSigmoid(theseDerivatives));
+                theseDerivatives = multiplyArrs(theseDerivatives,layerSigmoidDerivative(theseDerivatives));
                 
                 
                 //update "current derivatives" array
@@ -350,7 +350,7 @@ function network () {
         
        //Update the error
         this.lastMeanError = mean(this.errorArr);
-        this.errorHistory.push({fires : lastMeanError});
+        this.errorHistory.push({fires : this.lastMeanError});
     }
     
     
@@ -473,7 +473,7 @@ function mean (numbers) {
 
 
 //Finds the derivative of the sigmoid function for each thing in the array
-function layerSigmoid (arr) {
+function layerSigmoidDerivative (arr) {
     
     var output = [];
     
