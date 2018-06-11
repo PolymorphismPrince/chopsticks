@@ -19,7 +19,59 @@
 #When you call the train function pass in one array of arrays of inputs
 */
 
+var initialisedNetworks = [];
+
+//Event listener for key short cuts
+document.addEventListener("keydown", function(e) {
+    if (e.keyCode == 71) {
+        GUI.toggle();
+    }
+}, false);
+
+
+var placeholder;
+
+//GUI
+GUI = {
+    
+    toggled : false,
+    
+    graph : function () {
+        
+    },
+    
+    update : function () {
+        
+    },
+    
+    toggle : function() {
+          
+        if (this.toggled == true) {
+            
+            
+            document.body.removeChild(this.GUIDiv);
+            this.toggled = false;
+            clearInterval(this.loop);
+        }
+        
+        else {
+            this.toggled = true;
+            document.body.innerHTML += "<div id='netGUI' style='width:100%; height:100%; background-color: grey; position: absolute; top: 0px; left: 0px; opacity: 0.5;'> </div> ";
+            
+            this.GUIDiv = document.getElementById("netGUI");
+            
+            placeholder = this.GUIDiv;
+            this.GUIDiv.innerHTML += "<button onclick='GUI.toggle()'> Close </button>";
+            this.loop = setInterval(this.update,500);
+        }
+    }
+}
+
 function network () {
+    
+    this.errorHistory = [];
+    
+    this.fires = 0;
     
     this.lastOutputLayer;
     
@@ -30,6 +82,8 @@ function network () {
     this.layers = [];
     
     this.netFire = function (inputs) {
+        
+        this.fires++;
         if (this.initialised == true) {
             var allOutputs = [];
             var allInputs = [];
@@ -98,6 +152,7 @@ function network () {
     this.initNet = function (config) {
         
         this.initialised = true;
+        initialisedNetworks.push(this);
         this.config = config;
         
         
@@ -254,7 +309,7 @@ function network () {
                 //Find derivative of outputs with respect to inputs
                 theseDerivatives = multiplyArrs(theseDerivatives,layerSigmoid(theseDerivatives));
                 
-                console.log(currentDerivatives,theseDerivatives,multiplyArrs(theseDerivatives,currentDerivatives));
+                
                 //update "current derivatives" array
                 currentDerivatives = multiplyArrs(theseDerivatives,currentDerivatives);
                 
@@ -295,6 +350,7 @@ function network () {
         
        //Update the error
         this.lastMeanError = mean(this.errorArr);
+        this.errorHistory.push({fires : lastMeanError});
     }
     
     
