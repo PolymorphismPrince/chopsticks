@@ -1,23 +1,69 @@
-/* 
 
-#This is made by Aden Power, and will be hereby known as "chopsticks.js". It is a neural network. Construction commenced on 18/5/18.
 
-#Networks configurations are in an array where the number of values is the number of layers (including input/output) and the value is the number of neurons on that layer.
 
-#Inputs to a neural net should be passed into the "net fire" function as an array.
+Array.prototype.knownDimensions = 1;
+Array.prototype.multiDimensional = false;
+function constructTensor (shape,method,position) {
+	method = method || function () {return 0;}
+    position = position || [];
+  	
+   if (shape.length == 0) {return method(position);}
 
-#Input to the backprop function should be in the format that is returned by the train function; an array containing two arrays:
-                                            1. Contains an array for each training data set which in turn contains two more arrays:
-                                                                    a) one array per layer containing the inputs into each neuron of that layer
-                                                                    b) one array per layer containing the outputs from each neuron of that layer
-                                                                    
-                                                                    
-                                            2. Contains an array for each set of training data. That array contains ideal outputs for every neuron in the output layer.
-                                            
-#Current cost function is simply (ideal - actual), if I want to change this need to work out the new derivative
+	var output = [];
+	output.knownDimensions = shape.length;
+    if (shape.length > 1) {output.multiDimensional = true;}
+  
+	for (let i = 0; i < shape[0]; i++) {
+  	let positionTemp = position.slice();
+    positionTemp.push(i);
+    var shapeTemp = shape.slice(1);
+    
+    if (typeof shapeTemp[0] == "function") {shapeTemp[0] = shape[1](positionTemp);}
+    
+  	output[i] = constructTensor(shapeTemp,method,positionTemp);
+    
+  }
+  return output;
+}
 
-#When you call the train function pass in one array of arrays of inputs
-*/
+
+
+
+Array.prototype.forAll = function (func,reverse,position) {
+	position = position || [];
+	reverse = reverse || false;  
+  
+  
+  
+	if (reverse) {
+			for (let i = this.length - 1; i >= 0; i--)  {
+      	
+      	let positionTemp = position.slice();
+        positionTemp.push(i);
+        
+        this.forAll.apply(this[i],[func,false,positionTemp]);
+        
+      }
+  }
+  else {
+  
+  	for (let i = 0; i < this.length; i++)  {
+    		
+      	let positionTemp = position.slice();
+        positionTemp.push(i);ind
+        
+        if (this.multiDimensional == false) {
+    
+          this[i] = func(positionTemp,this[i]);
+          
+          continue;
+      	}
+        
+        this.forAll.apply(this[i],[func,false,positionTemp]);
+        
+      }
+  }
+}
 
 var initialisedNetworks = [];
 
@@ -81,383 +127,224 @@ function network () {
     
     this.layers = [];
     
-    this.netFire = function (inputs) {
+    this.netFire = function (inputs,backProp) {
         
         this.fires++;
+        
         if (this.initialised == true) {
-            var allOutputs = [];
-            var allInputs = [];
-            var layerOuts = [];
-            var lastLayerOuts = [];
-            var layerIns = [];
             
-            for (let l = 0; l < this.layers.length; l++) {
-               
-                //we are doing this so we have a copy of the outputs of the last layer
-                lastLayerOuts = JSON.parse(JSON.stringify(layerOuts));
-                layerOuts = [];
-                layerIns = [];
+            var lastOutputs = inputs.slice();
+            var config = this.config;
+            var allInputs = constructTensor([this.config.length + 1,function (pos) {
+                
+                return config[pos[0]];
+            }]);
+            allInputs[0] = inputs;
+            
+            
+            
+            for (let l = 0; l < this.config.length; l++) {
+                let lastOutputsTemp = sig(lastOutputs);
                 
                 
-                for (let n = 0; n < this.layers[l].neurons.length; n++) {
-                
-
-                    if (l == 0) {
-                        
-                        layerOuts.push(inputs[n]);
-                        
-                        layerIns.push(inputs[n]);
-                        
-                        
-
-                    }
-
-                    else {
-
-                        let neuronIn = 0;
-                        for (let k = 0; k < this.layers[l-1].neurons.length; k++) {
-                            neuronIn += this.layers[l-1].neurons[k].weights[n] * lastLayerOuts[k];
-                            
-                        }
-                        
-
-                        layerIns.push(neuronIn+this.layers[l].neurons[n].bias);
-                        layerOuts.push(this.layers[l].neurons[n].fire(neuronIn));
-                        
-                    }
+                for (let n = 0; n < this.config[l]; n++) {
                     
                     
-                }
-                //Update the arrays of inputs and outputs
-                allInputs.push(layerIns);
                     
-                allOutputs.push(layerOuts);
-                
+                    lastOutputs[n] = sum(multiplyArrays(lastOutputsTemp,this.weights[l][n])) + this.biasses[l][n];
+                    
+                    allInputs[l + 1][n] = lastOutputs[n];
+                    
+                } 
+            
             }
             
-
-            this.lastOutputLayer = JSON.parse(JSON.stringify(layerOuts));
             
-            return [allInputs,allOutputs];
         }
         else {
-            throw "Network Not initalised!";
+            throw "network error: Network not initalised!";
         }
+        
+        return (backProp == true) ? allInputs : sig(allInputs[allInputs.length-1]);
+        
     }
     
-    this.config = [];
     
     this.initialised = false;
     
     this.initNet = function (config) {
         
+        if (this.initialised) {
+            throw "network error: Network already initalised!";
+        }
         this.initialised = true;
+        this.inputSize = config[0];
+        this.config = config.slice(1);
+        
+        
+        this.weights = constructTensor([config.length-1,function (pos) {
+            return config[pos[0] + 1];
+        },function (pos) {
+            return config[pos[0]];
+        }],function (pos) {
+            return parseFloat(((Math.random().toFixed(3)) * 2 - 1).toFixed(2));
+        });
+        
+        
+        
+        this.biasses = constructTensor([config.length - 1, function (pos) {
+            return config[pos[0] + 1];
+        }],function (pos) {
+            return parseFloat(((Math.random().toFixed(3)) * 2 - 1).toFixed(2));
+        });
+        
         initialisedNetworks.push(this);
-        this.config = config;
         
-        
-        //Create layers, in each create neurons and their bias 
-        for (let l = 0; l < config.length; l++) {
-            if (l > 10) {
-                throw "l";
-            } 
-            this.layers.push(new layer(l,this));
-            
-            for (let n = 0; n < config[l]; n++) {
-                if (n > 10) {
-                    throw "n";
-                }   
-                //Random generate a bias between 1 and - 1
-                let b = (l > 0) ? (1 - (2 * (Math.round(Math.random() * 100)) / 100)) : 0;
-                if (b > 10) {
-                    throw "b";
-                } 
-                this.layers[l].neurons.push(new neuron(b,this.layers[l],this));
-            }
-            
-        }
-        
-        
-        //create synapses if it's not the last layer
-        for (let l = 0; l < this.layers.length; l++) { 
-            if (l > 10) {
-                throw "l";
-            } 
-            if (l != this.layers.length - 1) {
-                
-                for (let n = 0; n < this.layers[l].neurons.length; n++) {
-                    if (n > 10) {
-                        throw "n";
-                    } 
-                    for (let k = 0; k < this.layers[l+1].neurons.length; k ++) {
-                        if (k > 10) {
-                            throw "k";
-                        } 
-                        this.layers[l].neurons[n].weights.push(parseFloat(Math.random().toFixed(2)));
-                    }
-                }
-            }
-        }   
     }
+
+    //Default learning rate:
+    this.learningRate = 0.01;
         
-    this.backProp = function (trainingResults) {
-        this.errorArr = [];
-        var idealOuts = trainingResults[1];
+    this.backProp = function (inputs,desiredOutputs,error) {
         
-        var compoundedNewValues = [];
-        
-        
-        //Fill all of them with 0s in reverse order so that the changes can be added to later in the same order that they are back-propogated through
-        for (let l = 0; l < this.layers.length; l++) {
-            
-            compoundedNewValues[l] = [];
-            for (let n = 0; n < this.layers[l].neurons.length; n++) {
-                compoundedNewValues[l].push([]);
-                
-                for (let w = 0; w < this.layers[l].neurons[n].weights.length; w++) {
-                    
-                    compoundedNewValues[l][n].push(0);
-                }
-            }
-        }
-        
+        var newWeights = JSON.parse(JSON.stringify(this.weights));
+        var newBiasses = JSON.parse(JSON.stringify(this.biasses));
         
         
         //Itterate for every training example"
-        for (let i = 0; i < idealOuts.length; i++) {
+        for (let i = 0; i < desiredOutputs.length; i++) {
             
-            let actualIns = trainingResults[0][i][0];
+            let specificInputs = inputs[i];
+            let specificDesiredOutputs = desiredOutputs[i];
             
+            let derivatives = [];
+            let outputLayer = JSON.parse(JSON.stringify(specificInputs[specificInputs.length - 1]));
             
-            
-            let actualOuts = trainingResults[0][i][1];
-            let outputLayer = actualOuts[actualOuts.length-1];
-            let layerError = [];
-            let layerErrorDerivatives = [];
-            
-            
-            for (let j = 0; j < outputLayer.length; j++) {
+            outputLayer.forEach (function (element,index) {
                 
-                layerError.push(Math.abs(idealOuts[i][j] - outputLayer[j]));
-                layerErrorDerivatives.push((idealOuts[i][j] > outputLayer[j]) ? -1 : 1);
-            }
-            
-            
-            
-            //ALERT: it's possible the -1 and 1 need to be switched out in the line above
-            
-            
-            
-            //Differentiate Output layer outs with respect to their net input
-            let outputDerivatives = layerSigmoidDerivative(outputLayer);
-            
-            let totalLayerError = sum(layerError);
-            this.errorArr.push(totalLayerError);
-           
-            
-            //The array of these values
-            let newValues = [];
-            
-            
-            //An array of the deriviatives of the layer in front with respect to each neuron in this layer
-            let currentDerivatives = [multiplyArrs(outputDerivatives,layerErrorDerivatives)];
-            
-            
-            for (let l = this.layers.length - 1; l >= 0; l--) {
-                
-                
-                let layerArray = [];
-                
-                //We've already done the output layer
-                if (l == this.layers.length - 1) {
-                    continue;
-                }
-                
-                
-                
-                
-                let theseDerivatives = [];
-                for (let n = 0; n < this.layers[l].neurons.length; n++) {
-                    
-                    let neuronArray = [];
-                    
-                    //Work out the derivative of the neuron in the layer in front with respect to this weight
-                    for (let w = 0; w < this.layers[l].neurons[n].weights.length; w++) {
-                        
-                        let change = actualOuts[l][n] * currentDerivatives[w];
-                        
-                        
-                        neuronArray.push(change);
-                    }
-                    
-                    layerArray[n] = neuronArray;
-                    
-                    //Calulate the derivatives of each neuron in the next layer's net input with respect to each neuron in this layer net output. Since it's linear the derivative is just the weight of the synapse going between them.
-                    theseDerivatives[n] = 0;
-                    
-                    for (let z = 0; z < this.layers[l+1].neurons.length; z++) {
-                        
-                        theseDerivatives[n] += this.layers[l].neurons[n].weights[z];
-                    }
-                    
-                    
-                    
-                }
-                
-                newValues[l] = layerArray;
-                
-                //Find derivative of outputs with respect to inputs
-                theseDerivatives = multiplyArrs(theseDerivatives,layerSigmoidDerivative(theseDerivatives));
-                
-                
-                //update "current derivatives" array
-                currentDerivatives = multiplyArrs(theseDerivatives,currentDerivatives);
-                
-                
-                
-            }
+                //Differentiate the total error with respect to each output: the function is f(x) = (y - x)^2 + z. The derivative, therefore, is f(x) = 2y - 2x.
+                derivatives.push(specificDesiredOutputs[index] * 2 - sig(element) * 2);
+            });
             
             
 
-            
-            //Add to the big compounded change
-            for (let l = this.layers.length - 1; l > 0; l--) {
-                if (l == 0) {
-                    continue;
-                }
+            //Itterate through each layer backwards and do the weights and biasses
+            for (let l = this.config.length - 1; l >= 0; l--) {
                 
-                for (let n = 0; n < this.layers[l].neurons.length; n++) {
+                //Differentiate Output layer outs with respect to their net input. function is sigmoid, derivative of sigmoid is sig(x) * (1 - sig(x))
+                derivatives = multiplyArrays(layerSigmoidDerivative(inputs[i][l + 1]),derivatives);
+                
+                //Make the derivatives really small and the reverse of their sign for the change so we don't overshoot.
+                let changes = multiplyArrays(derivatives.slice().fill(this.learningRate * 1),derivatives);
+                
+                
+                //Differentiate biasses:
+                //Biasses are added, this means the derivatives are 1 and so using the chain rule it's just the derivative of net input of the layer. (1x = x obviously)
+                newBiasses[l] = addArrays(changes,newBiasses[l]);
+                
+                let derivativesTemp = [];
+                //Because foreach uses an anoynmous function, "this" is not the network
+                let currentNetwork = this;
+                
+                //Differntiate weights and net outputs of the next layer backwards.
+                this.weights[l].forEach(function (neuron,neuronNum) {
                     
-                    for (let w = 0; w < this.layers[l].neurons[n].weights.length; w++) {
+                    //This is completly linear here: y = wn + b. (b is the rest of the weighted sum, w is the current weight and n is the output of the last layer. The gradient is just the output of the last layer. and for the derivative of the output of the last layer, you do the opposite. The gradient is just the weight. )
+                    
+                    currentNetwork.weights[l][neuronNum].forEach(function(weight,weightNum) {
                         
-                        compoundedNewValues[l][n][w] += newValues[l][n][w];
-                    }
-                }
+                        
+                        //Update the newWeights array
+                        newWeights[l][neuronNum][weightNum] += sig(specificInputs[l][weightNum]) * changes[neuronNum];
+                        
+                        
+                        
+                        //Update a temporary value of the derivatives, we add to it instead of just updating it because it's the sum of the derivatives of all the neurons in the next layer with respect to it
+                        derivativesTemp[weightNum] = derivativesTemp[weightNum] || 0;
+                        derivativesTemp[weightNum] += weight * derivatives[neuronNum];
+                    });
+                    
+       
+                });
+                
+                derivatives = derivativesTemp.slice();
+                 
             }
             
         }
-        
-        //Time to update the values!!! YAY!!! FINALLY!!!! FINNNNNNNAAAALLLLY!!!!!!!!
-        
-        for (let l = this.layers.length - 1; l > 0; l--) {
             
-                for (let n = 0; n < this.layers[l].neurons.length; n++) {
-                    for (let w = 0; w < this.layers[l].neurons[n].weights.length; w++) {
-                        this.layers[l].neurons[n].weights[w] -= compoundedNewValues[l][n][w];
-                    }
-                }
-            }
-        
-       //Update the error
-        this.lastMeanError = mean(this.errorArr);
-        this.errorHistory.push({fires : this.lastMeanError});
+        //Update the actual weights and biasses:
+        this.weights = JSON.parse(JSON.stringify(newWeights));
+        this.biasses = JSON.parse(JSON.stringify(newBiasses)); 
     }
     
     
-    this.train = function (ins) {
+    this.train = function (ins,expectedOuts) {
         
         var allReturnValues = [];
-        
+        var allError = [];
+        var totalError;
         //Itterate through each training example
         for (let i = 0; i < ins.length; i++) {
             
             //Fire the array
-            returnValues = this.netFire(ins[i]);
-            allReturnValues.push(returnValues);
+            returnValues = this.netFire(ins[i],true);
             
+            allReturnValues.push(returnValues);
+            if (expectedOuts != undefined) {
+                allError.push(sumSquaredError(returnValues[returnValues.length - 1],expectedOuts[i]));
+                
+            }
+            
+
         }
         
-        return allReturnValues;
+        if (expectedOuts != undefined) {
+            
+            totalError = mean(allError);
+            this.backProp(allReturnValues,expectedOuts,allError);
+            return totalError;
+        }
+        else {
+        
+            return allReturnValues;
+        }
     }
 
 } 
 
 
-function neuron (bias,layer,net) {
+function sumSquaredError(arr1,arr2) {
+    var difference = subtractArrays(arr2,arr1);
     
-    this.net = net;
-    this.layer = layer;
-    
-    this.bias = bias;
-    
-    this.weights = [];
-    
-    
-    this.fire = function (inputSum) {
-        
-        
-        inputSum += this.bias;
-        
-        return sig(inputSum);
+    for (let i = 0; i < difference.length; i++) {
+        difference[i] = Math.pow(difference[i],2);
         
     }
-}
-
-
-
-function layer (num, net) {
     
-    this.layerNum = num;
-    this.neurons = [];
+    return sum(difference);
+    
 }
+
+
+
         
 function sig (x) {
-
+    
+    if (typeof x == "object") {
+        let output = [];
+        x.forEach (function (element) {
+            
+            output.push(1 / (1 + Math.pow(Math.E,-1 * element)));
+            
+        });
+        return output;
+    }
     return 1 / (1 + Math.pow(Math.E,-1 * x));
     
 }
 
 
-        
-//MAE and MSE won't work
-function MSE (trainingResults) {
-    //Mean squared Error  
-    
-    var idealOuts = trainingResults[0];
-    var actualOuts = trainingResults[1];
-    
-    let arr = [];
-    
-    for (let i of idealOuts) {
-        
-        let num = 0;
-        
-        for (let k = 0; k < idealOuts[i].length; k++) {
-            
-            num += Math.pow(idealOuts - actualOuts,2);
-        }
-        
-        arr.push(num);
-    }
-    
-    return mean(arr);
-}
-    
-
-        
-function MAE (trainingResults) {
-    //Mean absolute error
-    
-    var idealOuts = trainingResults[0];
-    var actualOuts = trainingResults[1];
-    
-    let arr = [];
-    
-    for (let k = 0; k < idealOuts[i].length; k++) {
-        
-        let num = 0;
-        
-        for (let k = 0; k < idealOuts[i].length; k++) {
-            
-            num += Math.abs(idealOuts - actualOuts);
-        }
-        
-        arr.push(num);
-    }
-    
-    return mean(arr);
-}
-         
 function sum (numbers) {
     //input is array
     return numbers.reduce(function(a,c) {
@@ -477,14 +364,18 @@ function layerSigmoidDerivative (arr) {
     
     var output = [];
     
+    
     for (let i = 0; i < arr.length; i++) {
-        output.push(arr[i]*(1-arr[i]));
+        
+        output.push(sig(arr[i])*(1-sig(arr[i])));
+        
     }
+    
                     
     return output;                
 }
     
-function multiplyArrs (arr1,arr2) {
+function multiplyArrays (arr1,arr2) {
     
     //If they aren't equal in length return empty array
     if (arr1.length != arr2.length) {
@@ -501,8 +392,8 @@ function multiplyArrs (arr1,arr2) {
     return output;
 }
 
-
-function addArrs (arr1,arr2) {
+function addArrays (arr1,arr2) {
+    
     //If they aren't equal in length return empty array
     if (arr1.length != arr2.length) {
         return [];
@@ -510,7 +401,7 @@ function addArrs (arr1,arr2) {
     
     var output = [];
     
-    for (let i = 0; i < arr.length; i++) {
+    for (let i = 0; i < arr1.length; i++) {
         
         output.push(arr1[i] + arr2[i]);
     }
@@ -518,8 +409,27 @@ function addArrs (arr1,arr2) {
     return output;
 }
 
-function getRandomInt(min, max) {
+function subtractArrays (arr1,arr2) {
     
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    //If they aren't equal in length return empty array
+    if (arr1.length != arr2.length) {
+        return [];
+    }
+    
+    var output = [];
+    
+    for (let i = 0; i < arr1.length; i++) {
+        
+        output.push(arr1[i] - arr2[i]);
+    }
+    
+    return output;
 }
+
+function getRandomInt (min,max) {
+    return Math.floor(Math.random() * (max - min) + min);
+}
+
+
+
 
