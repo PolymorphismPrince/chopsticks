@@ -1,4 +1,39 @@
 
+var activationFunctions = {
+    sigmoid : function (x) {
+        return 1 / (1 + Math.pow(Math.E,-1 * x));
+    },
+    
+    tanh : Math.tanh,
+    
+    reLU : function (x) {
+        return Math.max(x,0);
+    },
+        
+    linear : function (x) {
+        return x;
+    }
+    
+    
+    
+    
+}
+
+var activationDerivatives = {
+    sigmoid : function (x) {
+        return activationFunctions.sigmoid(x) * (1- activationFunctions.sigmoid(x));
+    },
+    
+    tanh : function (x) {
+        return 1 - Math.pow(Math.tanh(x),2);
+    },
+    
+    reLU : function (x) {
+        return (x <= 0) ? 0 : 1;
+    },
+        
+    linear : 1
+}
 
 
 Array.prototype.knownDimensions = 1;
@@ -115,6 +150,8 @@ GUI = {
 
 function network () {
     
+    this.activationConfig = [];
+    
     this.errorHistory = [];
     
     this.fires = 0;
@@ -144,7 +181,8 @@ function network () {
             
             for (let l = 0; l < this.config.length; l++) {
                 
-                let lastOutputsTemp = sig(lastOutputs);
+                let lastOutputsTemp = lastOutputs.map(activationFunctions[this.activationConfig[l]]);
+                
                 lastOutputs = [];
                 for (let n = 0; n < this.config[l]; n++) {
                     
@@ -166,7 +204,7 @@ function network () {
         }
         
         
-        return (backProp == true) ? allInputs : sig(allInputs[allInputs.length-1]);
+        return (backProp == true) ? allInputs : allInputs[allInputs.length-1].map(activationFunctions[this.activationConfig[this.activationConfig.length - 1]]);
         
     }
     
@@ -178,6 +216,10 @@ function network () {
         if (this.initialised) {
             throw "network error: Network already initalised!";
         }
+        
+        this.activationConfig.length = config.length;
+        this.activationConfig.fill("linear");
+        console.log(this.activationConfig,config.length);
         this.initialised = true;
         this.inputSize = config[0];
         this.config = config.slice(1);
@@ -228,7 +270,7 @@ function network () {
             outputLayer.forEach (function (element,index) {
                 
                 //Differentiate the total error with respect to each output: the function is f(x) = (y - x)^2 + z. The derivative, therefore, is f(x) = 2y - 2x.
-                derivatives.push(specificDesiredOutputs[index] * 2 - sig(element) * 2);
+                derivatives.push(specificDesiredOutputs[index] * 2 - activationFunctions[this.activationConfig[this.activationConfig.length - 1]](element) * 2);
             });
             
             
@@ -237,7 +279,7 @@ function network () {
             for (let l = this.config.length - 1; l >= 0; l--) {
                 
                 //Differentiate Output layer outs with respect to their net input. function is sigmoid, derivative of sigmoid is sig(x) * (1 - sig(x))
-                derivatives = multiplyArrays(layerSigmoidDerivative(inputs[i][l + 1]),derivatives);
+                derivatives = multiplyArrays(inputs[i][l + 1].map(activationDerivatives[this.activationConfig[l + 1]]),derivatives);
                 
                 //Make the derivatives really small and the reverse of their sign for the change so we don't overshoot.
                 let changes = multiplyArrays(derivatives.slice().fill(this.learningRate * 1),derivatives);
@@ -260,7 +302,7 @@ function network () {
                         
                         
                         //Update the newWeights array
-                        newWeights[l][neuronNum][weightNum] += sig(specificInputs[l][weightNum]) * changes[neuronNum];
+                        newWeights[l][neuronNum][weightNum] += activationFunctions[currentNetwork.activationConfig[l]](specificInputs[l][weightNum]) * changes[neuronNum];
                         
                         
                         
@@ -300,11 +342,12 @@ function network () {
             
             //Fire the array
             returnValues = this.netFire(ins[i],true);
-            //Find the error
             
+            //Find the error
             allReturnValues.push(returnValues);
             if (expectedOuts != undefined) {
-                allError.push(sumSquaredError(returnValues[returnValues.length - 1],expectedOuts[i]));
+                let outputLayer = returnValues[returnValues.length - 1].map(activationFunctions[this.activationConfig[this.activationConfig.length - 1]]);
+                allError.push(sumSquaredError(outputLayer,expectedOuts[i]));
                 
             }
             
@@ -324,7 +367,7 @@ function network () {
             this.errorHistory.push(totalError);
             var lastThreeErrors = this.errorHistory.slice(this.errorHistory.length - 3,this.errorHistory.length);
             
-            console.log(Math.max(...lastThreeErrors));
+            
             //Work out the learning rate...
             var nextThreshold = this.phases[this.phase].thresh;
             
@@ -375,25 +418,6 @@ function sumSquaredError(arr1,arr2) {
     
 }
 
-
-
-        
-function sig (x) {
-    
-    if (typeof x == "object") {
-        let output = [];
-        x.forEach (function (element) {
-            
-            output.push(1 / (1 + Math.pow(Math.E,-1 * element)));
-            
-        });
-        return output;
-    }
-    return 1 / (1 + Math.pow(Math.E,-1 * x));
-    
-}
-
-
 function sum (numbers) {
     //input is array
     return numbers.reduce(function(a,c) {
@@ -408,21 +432,6 @@ function mean (numbers) {
 }
 
 
-//Finds the derivative of the sigmoid function for each thing in the array
-function layerSigmoidDerivative (arr) {
-    
-    var output = [];
-    
-    
-    for (let i = 0; i < arr.length; i++) {
-        
-        output.push(sig(arr[i])*(1-sig(arr[i])));
-        
-    }
-    
-                    
-    return output;                
-}
     
 function multiplyArrays (arr1,arr2) {
     
