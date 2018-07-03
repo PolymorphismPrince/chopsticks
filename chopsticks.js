@@ -130,7 +130,6 @@ function network () {
     this.netFire = function (inputs,backProp) {
         
         this.fires++;
-        
         if (this.initialised == true) {
             
             var lastOutputs = inputs.slice();
@@ -144,9 +143,9 @@ function network () {
             
             
             for (let l = 0; l < this.config.length; l++) {
+                
                 let lastOutputsTemp = sig(lastOutputs);
-                
-                
+                lastOutputs = [];
                 for (let n = 0; n < this.config[l]; n++) {
                     
                     
@@ -162,8 +161,10 @@ function network () {
             
         }
         else {
+            
             throw "network error: Network not initalised!";
         }
+        
         
         return (backProp == true) ? allInputs : sig(allInputs[allInputs.length-1]);
         
@@ -203,8 +204,12 @@ function network () {
     }
 
     //Default learning rate:
-    this.learningRate = 0.01;
-        
+    this.learningRate = 0.1;
+    
+    this.phase = 0;
+    
+    this.phases = [{thresh:0.7,rate:0.05},{thresh:0.5,rate:0.02},{thresh:0.2,rate:0.01},{thresh:0.05,rate:0.001}];
+    
     this.backProp = function (inputs,desiredOutputs,error) {
         
         var newWeights = JSON.parse(JSON.stringify(this.weights));
@@ -272,11 +277,17 @@ function network () {
             }
             
         }
-            
+        
+        //Make backups of the weights and biasses incase this change was a very bad idea.
+        this.backUps[0] = JSON.parse(JSON.stringify(this.weights));
+        this.backUps[1] = JSON.parse(JSON.stringify(this.biasses));
+        
         //Update the actual weights and biasses:
         this.weights = JSON.parse(JSON.stringify(newWeights));
         this.biasses = JSON.parse(JSON.stringify(newBiasses)); 
-    }
+    },
+        
+    this.backPropSetSize = 100;
     
     
     this.train = function (ins,expectedOuts) {
@@ -289,6 +300,7 @@ function network () {
             
             //Fire the array
             returnValues = this.netFire(ins[i],true);
+            //Find the error
             
             allReturnValues.push(returnValues);
             if (expectedOuts != undefined) {
@@ -298,20 +310,57 @@ function network () {
             
 
         }
-        
+        //If we're doing backprop:
         if (expectedOuts != undefined) {
             
+            //Average the error of all of the training examples
             totalError = mean(allError);
+            //Make sure there is at least 3 errors
+            if (this.errorHistory.length == 0) {
+                this.errorHistory = [10,10];
+                
+            }
+            
+            this.errorHistory.push(totalError);
+            var lastThreeErrors = this.errorHistory.slice(this.errorHistory.length - 3,this.errorHistory.length);
+            
+            console.log(Math.max(...lastThreeErrors));
+            //Work out the learning rate...
+            var nextThreshold = this.phases[this.phase].thresh;
+            
+            var lastThreshold = (this.phases[this.phase - 1]) ? this.phases[this.phase - 1].thresh : Infinity;
+                //If it's progressed a phase forwards
+            if (Math.max(...lastThreeErrors) < nextThreshold) {
+                this.phase++;
+                
+            }
+                //If it's gone a phase backwards bring it back to a back up
+            else if (totalError >= lastThreshold) {
+                
+                this.weights = JSON.parse(JSON.stringify(this.backUps[0]));
+                this.biasses = JSON.parse(JSON.stringify(this.backUps[1]));
+                
+            }
+            else {
+                
+            }
+            this.learningRate = this.phases[this.phase].rate; 
             this.backProp(allReturnValues,expectedOuts,allError);
+            console.log("Thresholds: " + lastThreshold, nextThreshold);
             return totalError;
         }
         else {
-        
+            
             return allReturnValues;
         }
+        
+        
     }
+    
+    this.backUps = [];
+}
 
-} 
+
 
 
 function sumSquaredError(arr1,arr2) {
