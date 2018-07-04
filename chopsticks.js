@@ -32,7 +32,9 @@ var activationDerivatives = {
         return (x <= 0) ? 0 : 1;
     },
         
-    linear : 1
+    linear : function (x) {
+        return 1;
+    }
 }
 
 
@@ -171,10 +173,12 @@ function network () {
             
             var lastOutputs = inputs.slice();
             var config = this.config;
+            var inputSize = this.inputSize;
             var allInputs = constructTensor([this.config.length + 1,function (pos) {
                 
-                return config[pos[0]];
+                return config[pos[0] - 1] || inputSize;
             }]);
+            
             allInputs[0] = inputs;
             
             
@@ -219,7 +223,7 @@ function network () {
         
         this.activationConfig.length = config.length;
         this.activationConfig.fill("linear");
-        console.log(this.activationConfig,config.length);
+        
         this.initialised = true;
         this.inputSize = config[0];
         this.config = config.slice(1);
@@ -250,7 +254,7 @@ function network () {
     
     this.phase = 0;
     
-    this.phases = [{thresh:0.7,rate:0.05},{thresh:0.5,rate:0.02},{thresh:0.2,rate:0.01},{thresh:0.05,rate:0.001}];
+    this.phases = [{thresh:0.7,rate:0.03},{thresh:0.5,rate:0.01},{thresh:0.2,rate:0.005},{thresh:0.05,rate:0.001}];
     
     this.backProp = function (inputs,desiredOutputs,error) {
         
@@ -267,10 +271,12 @@ function network () {
             let derivatives = [];
             let outputLayer = JSON.parse(JSON.stringify(specificInputs[specificInputs.length - 1]));
             
+            let currentNetwork = this;
             outputLayer.forEach (function (element,index) {
                 
                 //Differentiate the total error with respect to each output: the function is f(x) = (y - x)^2 + z. The derivative, therefore, is f(x) = 2y - 2x.
-                derivatives.push(specificDesiredOutputs[index] * 2 - activationFunctions[this.activationConfig[this.activationConfig.length - 1]](element) * 2);
+                derivatives.push(specificDesiredOutputs[index] * 2 - activationFunctions[currentNetwork.activationConfig[currentNetwork.activationConfig.length - 1]](element) * 2);
+
             });
             
             
@@ -280,7 +286,6 @@ function network () {
                 
                 //Differentiate Output layer outs with respect to their net input. function is sigmoid, derivative of sigmoid is sig(x) * (1 - sig(x))
                 derivatives = multiplyArrays(inputs[i][l + 1].map(activationDerivatives[this.activationConfig[l + 1]]),derivatives);
-                
                 //Make the derivatives really small and the reverse of their sign for the change so we don't overshoot.
                 let changes = multiplyArrays(derivatives.slice().fill(this.learningRate * 1),derivatives);
                 
@@ -347,22 +352,25 @@ function network () {
             allReturnValues.push(returnValues);
             if (expectedOuts != undefined) {
                 let outputLayer = returnValues[returnValues.length - 1].map(activationFunctions[this.activationConfig[this.activationConfig.length - 1]]);
+                
                 allError.push(sumSquaredError(outputLayer,expectedOuts[i]));
                 
             }
             
-
+            
         }
         //If we're doing backprop:
         if (expectedOuts != undefined) {
             
             //Average the error of all of the training examples
             totalError = mean(allError);
+            
             //Make sure there is at least 3 errors
             if (this.errorHistory.length == 0) {
                 this.errorHistory = [10,10];
                 
             }
+            
             
             this.errorHistory.push(totalError);
             var lastThreeErrors = this.errorHistory.slice(this.errorHistory.length - 3,this.errorHistory.length);
@@ -389,7 +397,7 @@ function network () {
             }
             this.learningRate = this.phases[this.phase].rate; 
             this.backProp(allReturnValues,expectedOuts,allError);
-            console.log("Thresholds: " + lastThreshold, nextThreshold);
+            
             return totalError;
         }
         else {
@@ -407,14 +415,11 @@ function network () {
 
 
 function sumSquaredError(arr1,arr2) {
-    var difference = subtractArrays(arr2,arr1);
-    
-    for (let i = 0; i < difference.length; i++) {
-        difference[i] = Math.pow(difference[i],2);
+    return sum(arr1.map(function (value,index) {
         
-    }
+        return Math.pow(value - arr2[index],2);
+    }));
     
-    return sum(difference);
     
 }
 
@@ -467,22 +472,7 @@ function addArrays (arr1,arr2) {
     return output;
 }
 
-function subtractArrays (arr1,arr2) {
-    
-    //If they aren't equal in length return empty array
-    if (arr1.length != arr2.length) {
-        return [];
-    }
-    
-    var output = [];
-    
-    for (let i = 0; i < arr1.length; i++) {
-        
-        output.push(arr1[i] - arr2[i]);
-    }
-    
-    return output;
-}
+
 
 function getRandomInt (min,max) {
     return Math.floor(Math.random() * (max - min) + min);
