@@ -347,7 +347,7 @@ function network () {
             
             //Fire the array
             returnValues = this.netFire(ins[i],true);
-            
+            console.log(returnValues);
             //Find the error
             allReturnValues.push(returnValues);
             if (expectedOuts != undefined) {

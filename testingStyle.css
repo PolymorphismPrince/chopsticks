@@ -1,0 +1,10 @@
+.diagram {
+    border: 10px solid black;
+    
+}
+
+.info {
+    width: 50px;
+    display: inline-block;
+    vertical-align: top;
+}

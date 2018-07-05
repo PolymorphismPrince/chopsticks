@@ -3,12 +3,20 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
+    <link rel="stylesheet" href="testingStyle.css">
+    <title> ML Test Site</title>
 </head>
 
 <body>
-   <!-- <canvas id="canvas" style="position:absolute;" ></canvas> -->
-    
+   <canvas id="expected_canvas" width=500 height=500 class="diagram" ></canvas>
+    <canvas id="actual_canvas" width=500 height=500 class="diagram" ></canvas>
+    <br>
+    <button onclick="start()" id="start_button"> Start </button>
+    Speed: <input type="range" min="1" max="7" id="interval_size" value="1">
+    <br>
+    <strong>Error:</strong> <p id="info1" class="info"> Unknown</p> <br>
+    <strong>Itterations:</strong> <p id="info2" class="info"> 0</p> <br>
+    <strong>Learning Rate:</strong> <p id="info3" class="info"> 0</p>
     <script src="./chopsticks.js"></script>
     <script src="./test.js"></script>
 </body>
