@@ -154,6 +154,10 @@ function network () {
     
     this.activationConfig = [];
     
+    this.learningRateFunction = function (error) {
+        return (error > 0.7) ? 0.05 : Math.pow(error,2) / 14;
+    }
+
     this.errorHistory = [];
     
     this.fires = 0;
@@ -257,8 +261,6 @@ function network () {
     
     this.phase = 0;
     
-    //Default learning thresholds
-    this.phases = [{thresh:0.7,rate:0.03},{thresh:0.5,rate:0.01},{thresh:0.2,rate:0.005},{thresh:0.05,rate:0.001}];
     
     this.backProp = function (inputs,desiredOutputs,error) {
         
@@ -388,7 +390,7 @@ function network () {
             //Average the error of all of the training examples
             totalError = mean(allError);
             
-            //Make sure there is at least 3 errors
+            //Make sure there is at least 3 errors and record those
             if (this.errorHistory.length == 0) {
                 this.errorHistory = [10,10];
                 
@@ -400,26 +402,9 @@ function network () {
             
             
             //Work out the learning rate...
-            var nextThreshold = this.phases[this.phase].thresh;
-            
-            var lastThreshold = (this.phases[this.phase - 1]) ? this.phases[this.phase - 1].thresh : Infinity;
-                //If it's progressed a phase forwards
-            if (Math.max(...this.lastThreeErrors) < nextThreshold) {
-                console.log("Next Phase");
-                this.phase++;
-                
-            }
-                //If it's gone a phase backwards <bring it back to a back up> bring it back a phase
-            else if (Math.min(...this.lastThreeErrors) > lastThreshold) {
-                this.phase--
-                //this.weights = JSON.parse(JSON.stringify(this.backUps[0]));
-                //this.biasses = JSON.parse(JSON.stringify(this.backUps[1]));
-                
-            }
-            else {
-                console.log("No change");
-            }
-            this.learningRate = this.phases[this.phase].rate; 
+            this.learningRate = this.learningRateFunction(mean(this.lastThreeErrors));
+
+            //Call the backpropogation function to update the weights and biasses
             this.backProp(allReturnValues,expectedOuts,allError);
             
             return totalError;
