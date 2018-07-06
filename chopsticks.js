@@ -87,7 +87,7 @@ Array.prototype.forAll = function (func,reverse,position) {
   	for (let i = 0; i < this.length; i++)  {
     		
       	let positionTemp = position.slice();
-        positionTemp.push(i);ind
+        positionTemp.push(i);
         
         if (this.multiDimensional == false) {
     
@@ -258,6 +258,7 @@ function network () {
     
     this.backProp = function (inputs,desiredOutputs,error) {
         
+        //Arrays which will contain the sums of the weight and bias changes
         var newWeights = JSON.parse(JSON.stringify(this.weights));
         var newBiasses = JSON.parse(JSON.stringify(this.biasses));
         
@@ -279,18 +280,24 @@ function network () {
 
             });
             
-            
 
             //Itterate through each layer backwards and do the weights and biasses
             for (let l = this.config.length - 1; l >= 0; l--) {
                 
                 //Differentiate Output layer outs with respect to their net input. function is sigmoid, derivative of sigmoid is sig(x) * (1 - sig(x))
                 derivatives = multiplyArrays(inputs[i][l + 1].map(activationDerivatives[this.activationConfig[l + 1]]),derivatives);
+
                 //Make the derivatives really small and the reverse of their sign for the change so we don't overshoot.
                 let changes = multiplyArrays(derivatives.slice().fill(this.learningRate * 1),derivatives);
                 
                 
+
                 //Differentiate biasses:
+
+                //Set the value to 0 if it's the first training example so I can add to it
+                if (i == 0) {
+                    newBiasses[l].map(function () {return 0;})
+                }
                 //Biasses are added, this means the derivatives are 1 and so using the chain rule it's just the derivative of net input of the layer. (1x = x obviously)
                 newBiasses[l] = addArrays(changes,newBiasses[l]);
                 
@@ -305,10 +312,13 @@ function network () {
                     
                     currentNetwork.weights[l][neuronNum].forEach(function(weight,weightNum) {
                         
-                        
+                        //Reset the weight change to 0 if this is the first training set (because it was made as a copy of the actual weights and contains heaps of irrelevant values)
+                        if (i == 0) {
+                            newWeights[l][neuronNum][weightNum] = 0;
+                        }
+
                         //Update the newWeights array
                         newWeights[l][neuronNum][weightNum] += activationFunctions[currentNetwork.activationConfig[l]](specificInputs[l][weightNum]) * changes[neuronNum];
-                        
                         
                         
                         //Update a temporary value of the derivatives, we add to it instead of just updating it because it's the sum of the derivatives of all the neurons in the next layer with respect to it
@@ -329,9 +339,17 @@ function network () {
         this.backUps[0] = JSON.parse(JSON.stringify(this.weights));
         this.backUps[1] = JSON.parse(JSON.stringify(this.biasses));
         
-        //Update the actual weights and biasses:
-        this.weights = JSON.parse(JSON.stringify(newWeights));
-        this.biasses = JSON.parse(JSON.stringify(newBiasses)); 
+        var networkTemp = this;
+
+        //Update the actual weights and biasses by means of finding the average change to each one
+        for (let l = 0; l < newBiasses.length; l++) {
+            for (let n = 0; n < newBiasses[l].length; n++) {
+                networkTemp.biasses[l][n] += newBiasses[l][n] / desiredOutputs.length;
+                newWeights[l][n].forEach(function(element,index) {
+                    networkTemp.weights[l][n][index] += element / desiredOutputs.length;
+                })
+            }
+        }
     },
         
     this.backPropSetSize = 100;
@@ -347,12 +365,11 @@ function network () {
             
             //Fire the array
             returnValues = this.netFire(ins[i],true);
-            console.log(returnValues);
             //Find the error
             allReturnValues.push(returnValues);
             if (expectedOuts != undefined) {
                 let outputLayer = returnValues[returnValues.length - 1].map(activationFunctions[this.activationConfig[this.activationConfig.length - 1]]);
-                
+                //console.log("return values:",returnValues);
                 allError.push(sumSquaredError(outputLayer,expectedOuts[i]));
                 
             }
