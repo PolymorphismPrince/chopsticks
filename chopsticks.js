@@ -158,6 +158,9 @@ function network () {
     
     this.fires = 0;
     
+    //A variable to hold the last three errors updated by the train function
+    this.lastThreeErrors = [];
+
     this.lastOutputLayer;
     
     this.lastMeanError = [];
@@ -254,6 +257,7 @@ function network () {
     
     this.phase = 0;
     
+    //Default learning thresholds
     this.phases = [{thresh:0.7,rate:0.03},{thresh:0.5,rate:0.01},{thresh:0.2,rate:0.005},{thresh:0.05,rate:0.001}];
     
     this.backProp = function (inputs,desiredOutputs,error) {
@@ -335,6 +339,8 @@ function network () {
             
         }
         
+        
+
         //Make backups of the weights and biasses incase this change was a very bad idea.
         this.backUps[0] = JSON.parse(JSON.stringify(this.weights));
         this.backUps[1] = JSON.parse(JSON.stringify(this.biasses));
@@ -390,7 +396,7 @@ function network () {
             
             
             this.errorHistory.push(totalError);
-            var lastThreeErrors = this.errorHistory.slice(this.errorHistory.length - 3,this.errorHistory.length);
+            this.lastThreeErrors = this.errorHistory.slice(this.errorHistory.length - 3,this.errorHistory.length);
             
             
             //Work out the learning rate...
@@ -398,19 +404,20 @@ function network () {
             
             var lastThreshold = (this.phases[this.phase - 1]) ? this.phases[this.phase - 1].thresh : Infinity;
                 //If it's progressed a phase forwards
-            if (Math.max(...lastThreeErrors) < nextThreshold) {
+            if (Math.max(...this.lastThreeErrors) < nextThreshold) {
+                console.log("Next Phase");
                 this.phase++;
                 
             }
-                //If it's gone a phase backwards bring it back to a back up
-            else if (totalError >= lastThreshold) {
-                
-                this.weights = JSON.parse(JSON.stringify(this.backUps[0]));
-                this.biasses = JSON.parse(JSON.stringify(this.backUps[1]));
+                //If it's gone a phase backwards <bring it back to a back up> bring it back a phase
+            else if (Math.min(...this.lastThreeErrors) > lastThreshold) {
+                this.phase--
+                //this.weights = JSON.parse(JSON.stringify(this.backUps[0]));
+                //this.biasses = JSON.parse(JSON.stringify(this.backUps[1]));
                 
             }
             else {
-                
+                console.log("No change");
             }
             this.learningRate = this.phases[this.phase].rate; 
             this.backProp(allReturnValues,expectedOuts,allError);
